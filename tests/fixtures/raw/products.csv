@@ -1,0 +1,6 @@
+product_id,price_brl,name,category_id,description,stock_quantity,status,specs,created_at
+1,599.9,Violão Aurora,1,Synthetic acoustic guitar,3,active,"{""strings"": 6}",2025-01-01
+2,900,Violão Brisa,1,Synthetic sold-out guitar,0,active,{},2025-01-02
+3,750.25,Violão Antigo,1,Synthetic discontinued guitar,5,discontinued,{},2025-01-03
+4,650,Teclado Futuro,2,Synthetic upcoming keyboard,2,coming_soon,{},2025-01-04
+5,1200,Violão Horizonte,1,,1,active,,2025-01-05

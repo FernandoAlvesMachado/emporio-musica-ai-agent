@@ -1,0 +1,56 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python environments and build artifacts
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated state and temporary files
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+data/processed/*
+!data/processed/.gitkeep
+logs/
+tmp/
+temp/
+
+# Supplied originals may contain customer/order data or restricted documents.
+# Synthetic fixtures under tests/fixtures are intentionally tracked.
+data/raw/*
+!data/raw/.gitkeep
+docs/reference/*
+!docs/reference/.gitkeep
+**/*customers*.csv
+**/*orders*.csv
+**/*order_items*.csv
+!tests/fixtures/raw/customers.csv
+!tests/fixtures/raw/orders.csv
+!tests/fixtures/raw/order_items.csv
+
+# Local editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
