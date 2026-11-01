@@ -42,6 +42,8 @@ def _connect(database_path: Path) -> Iterator[sqlite3.Connection]:
     try:
         connection = sqlite3.connect(database_path.resolve().as_uri() + "?mode=ro", uri=True)
         connection.row_factory = sqlite3.Row
+        # Keep product rows and their promotions in one snapshot during web reloads.
+        connection.execute("BEGIN")
         yield connection
     except sqlite3.Error as error:
         raise CatalogError("Catalog database is unreadable. Run 'emporio load' to rebuild it.") from error
@@ -126,3 +128,17 @@ def get_product(database_path: Path, product_id: int) -> dict | None:
             _CATALOG + "SELECT * FROM catalog WHERE product_id = ?", (product_id,),
         ).fetchone()
         return _serialize(connection, row) if row is not None else None
+
+
+def get_catalog_summary(database_path: Path) -> dict[str, int]:
+    """Return catalog-only counters without exposing customer or order records."""
+    with _connect(database_path) as connection:
+        row = connection.execute(
+            "SELECT COUNT(*) AS product_count, "
+            "COALESCE(SUM(status = 'active' AND stock_quantity > 0), 0) AS available_count "
+            "FROM products"
+        ).fetchone()
+        promotions = connection.execute(
+            "SELECT COUNT(*) FROM promotions WHERE is_active = 1"
+        ).fetchone()[0]
+        return {**dict(row), "active_promotion_count": promotions}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Empório da Música · Atendimento</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23173d37'/%3E%3Cpath d='M7 21V11m6 14V7m6 16V9m6 11v-8' fill='none' stroke='%23e6815e' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Pular para o conteúdo</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Empório da Música, início">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M7 22V10m6 16V6m6 17V9m6 11v-8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
+      <span>Empório<span class="brand-second">da Música<span class="brand-dot">.</span></span></span>
+    </a>
+    <div class="header-right"><span class="local-badge"><span></span> Ambiente local</span><button id="import-button" class="button button-outline" type="button">Atualizar dados <span aria-hidden="true">↻</span></button></div>
+  </header>
+
+  <main id="main-content" class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">PRÉVIA DE ATENDIMENTO</p><h1 id="page-title">Toda boa música<br>começa com uma escolha<span>.</span></h1><p class="intro-copy">Explore instrumentos, confira a disponibilidade<br class="desktop-break"> e encontre as informações da loja.</p></div>
+      <div class="intro-art" aria-hidden="true"><div class="record"><div class="record-label"><svg viewBox="0 0 32 32" fill="none"><path d="M7 22V10m6 16V6m6 17V9m6 11v-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div></div><span class="art-caption">SUA MÚSICA COMEÇA AQUI</span></div>
+    </section>
+
+    <section class="stats" aria-label="Resumo do catálogo carregado">
+      <div><span id="product-count" class="stat-value">—</span><span class="stat-label">instrumentos no catálogo</span></div>
+      <div><span id="available-count" class="stat-value">—</span><span class="stat-label">disponíveis para tocar</span></div>
+      <div><span id="promotion-count" class="stat-value">—</span><span class="stat-label">promoções ativas nos dados</span></div>
+      <p class="stage-note"><span aria-hidden="true">✦</span> Consultas reais aos dados da loja.<br> O atendimento com IA chega na próxima etapa.</p>
+    </section>
+
+    <div id="global-message" class="notice" role="status" hidden></div>
+
+    <div class="workspace-heading"><div class="tabs" role="tablist" aria-label="Área de consulta"><button id="catalog-tab" class="tab" role="tab" aria-selected="true" aria-controls="catalog-panel" tabindex="0" type="button">Catálogo <span aria-hidden="true">↗</span></button><button id="policies-tab" class="tab" role="tab" aria-selected="false" aria-controls="policies-panel" tabindex="-1" type="button">Políticas da loja <span aria-hidden="true">↗</span></button></div><span class="workspace-caption">INFORMAÇÃO PARA ESCOLHER MELHOR</span></div>
+
+    <section id="catalog-panel" role="tabpanel" aria-labelledby="catalog-tab" class="workspace">
+      <aside class="filter-panel">
+        <div class="section-label"><span class="small-rule"></span> ENCONTRE SEU SOM</div>
+        <h2>Qual é a sua<br> próxima escolha?</h2>
+        <form id="catalog-form">
+          <label for="product-name">Nome ou modelo</label><input id="product-name" name="name" type="search" placeholder="Ex.: Yamaha, Takamine…" maxlength="200" autocomplete="off">
+          <label for="max-price">Preço máximo</label><div class="money-input"><span>R$</span><input id="max-price" name="max_price" type="text" inputmode="decimal" placeholder="Ex.: 1000,00" maxlength="24" aria-describedby="price-help"></div><p id="price-help" class="field-help">Considera a promoção ativa, quando aplicável.</p>
+          <label for="availability">Disponibilidade</label><select id="availability" name="availability"><option value="all">Todos os instrumentos</option><option value="available">Somente disponíveis</option><option value="unavailable">Somente indisponíveis</option></select>
+          <button id="search-button" class="button button-primary" type="submit">Buscar instrumentos <span aria-hidden="true">→</span></button><button id="clear-filters" class="text-button" type="button">Limpar filtros</button>
+        </form>
+        <div class="filter-tip"><span aria-hidden="true">♪</span><p>Busque por uma marca ou parte do nome do instrumento. Os preços e o estoque vêm do catálogo carregado.</p></div>
+      </aside>
+      <div class="results-area"><div class="results-heading"><div><p class="eyebrow">O SEU PRÓXIMO INSTRUMENTO</p><h2>Explore o catálogo</h2></div><span id="catalog-result-count" class="result-count" role="status" aria-live="polite"></span></div><div id="catalog-message" class="state-panel" role="status" hidden></div><div id="product-grid" class="product-grid" aria-busy="false"></div></div>
+    </section>
+
+    <section id="policies-panel" role="tabpanel" aria-labelledby="policies-tab" class="workspace policies-workspace" hidden>
+      <aside class="filter-panel"><div class="section-label"><span class="small-rule"></span> PODE PERGUNTAR</div><h2>Informação clara.<br>Sem ruído.</h2><p class="panel-copy">Encontre trechos do manual da loja e veja a página de origem.</p><form id="policy-form"><label for="policy-query">O que você quer consultar?</label><input id="policy-query" type="search" placeholder="Ex.: devolução" maxlength="200" required autocomplete="off"><button id="policy-search-button" class="button button-primary" type="submit">Buscar nas políticas <span aria-hidden="true">→</span></button></form><div class="suggestion-list"><p class="field-help">Experimente buscar por</p><button type="button" data-policy-query="devolucao">Devolução <span aria-hidden="true">↗</span></button><button type="button" data-policy-query="horario">Horário de funcionamento <span aria-hidden="true">↗</span></button><button type="button" data-policy-query="promocoes cumulativas">Promoções cumulativas <span aria-hidden="true">↗</span></button></div><div class="filter-tip"><span aria-hidden="true">↳</span><p>A busca encontra palavras presentes na mesma página. Regras divergentes precisam ser confirmadas com a equipe.</p></div></aside>
+      <div class="results-area"><div class="results-heading"><div><p class="eyebrow">DIRETO DO MANUAL</p><h2>Políticas da loja</h2></div><span id="policy-result-count" class="result-count" role="status" aria-live="polite"></span></div><div id="policy-message" class="state-panel" role="status"><span class="state-symbol" aria-hidden="true">↗</span><h3>Uma dúvida, uma boa referência.</h3><p>Busque um assunto ao lado para consultar os trechos originais e suas páginas.</p></div><div id="policy-results" class="policy-results" aria-busy="false"></div></div>
+    </section>
+
+    <footer class="site-footer"><span>Empório da Música<span class="brand-dot">.</span> <span class="footer-location">Campo Grande, MS</span></span><span>Protótipo do desafio Artefact · Dados locais</span></footer>
+  </main>
+
+  <dialog id="product-dialog" aria-labelledby="detail-name"><div class="dialog-top"><span class="eyebrow">CONHEÇA O INSTRUMENTO</span><button id="close-dialog" class="icon-button" type="button" aria-label="Fechar detalhes">×</button></div><div id="detail-message" class="state-panel" role="status" hidden></div><div id="detail-content"><p id="detail-category" class="eyebrow"></p><h2 id="detail-name"></h2><div id="detail-badges" class="badge-row"></div><div id="detail-price" class="detail-price"></div><p id="detail-description" class="detail-description"></p><dl id="detail-facts" class="detail-facts"></dl><div id="detail-promotion-note" class="notice" hidden></div><div id="detail-promotions" class="detail-section" hidden><h3>Promoções ativas nos dados</h3><ul id="detail-promotion-list"></ul></div><div id="detail-specs" class="detail-section" hidden><h3>Especificações</h3><dl id="detail-spec-list" class="spec-list"></dl></div><p class="detail-footnote">Disponibilidade e promoções refletem os arquivos carregados. Nenhum desconto é acumulado.</p></div></dialog>
+
+  <template id="product-template"><article class="product-card"><div class="card-top"><span class="card-category"></span><span class="card-id"></span></div><div class="instrument-motif" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3 class="card-name"></h3><div class="badge-row"></div><div class="card-bottom"><div class="card-price"></div><button class="card-detail-button" type="button" aria-label="Ver detalhes">↗</button></div></article></template>
+  <noscript><p class="notice">Ative o JavaScript no navegador para consultar os dados nesta interface.</p></noscript>
+</body>
+</html>

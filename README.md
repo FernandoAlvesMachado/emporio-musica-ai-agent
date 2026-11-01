@@ -3,10 +3,11 @@
 Python foundation for the Artefact AI Engineer challenge: a customer-service
 assistant for a fictional musical-instrument store in Campo Grande, Brazil.
 
-**Stage 1 is implemented: validated SQLite imports, real catalog queries, PDF policy
-extraction, lexical policy search, and a development terminal CLI. LLM integration
-is pending.** This CLI does not accept conversational requests, simulate an agent,
-or implement a customer-facing persona or out-of-scope routing yet.
+**The implemented foundation includes validated SQLite imports, real catalog queries,
+PDF policy extraction, lexical policy search, a development terminal CLI, and a
+local browser interface. LLM integration is pending.** Neither interface accepts
+conversational requests, simulates an agent, or implements a customer-facing persona
+or out-of-scope routing yet.
 
 ## Installation
 
@@ -36,8 +37,45 @@ python -m pip install -e ".[dev]"
 
 Activation is optional: use `.venv\Scripts\python.exe` on Windows or
 `.venv/bin/python` on Linux in place of `python`. No API key or provider account is
-needed. `pypdf` is the only runtime dependency; CSV, SQLite, configuration, and CLI
-use the standard library. Tests use `pytest`.
+needed. `pypdf` is the only runtime dependency; CSV, SQLite, configuration, CLI, and
+the local HTTP server use the standard library. Tests use `pytest`.
+
+## Local browser interface
+
+From the repository root, run:
+
+```sh
+python -m emporio_music serve --open-browser
+```
+
+On Windows without activating the environment:
+
+```powershell
+.\.venv\Scripts\python.exe -m emporio_music serve --open-browser
+```
+
+Keep this terminal open while testing. The command opens
+`http://127.0.0.1:8000` in the default browser. If it does not open automatically,
+open that address manually. Stop the server with `Ctrl+C`. If port 8000 is already
+in use, run `python -m emporio_music serve --port 8001 --open-browser` and use the
+address printed in the terminal.
+
+The Portuguese interface provides catalog cards, name/maximum-price/availability
+filters, product details, promotion information, catalog counters, and policy
+excerpts with PDF page references. These controls call the same data functions as
+the terminal commands. Search uses literal product names rather than natural-language
+questions; try `Yamaha`, a maximum price of `1000`, and available products.
+
+The server reads the configured SQLite snapshot and policy PDF. Starting it does
+not import data automatically: use the import button in the page or run the `load`
+command first. The button validates and imports all six configured source CSVs,
+just like the CLI. Existing catalog data is preserved if an import fails. The
+browser uses the same environment variables and `--root` configuration as the CLI.
+
+This is a local development interface bound only to `127.0.0.1`, not a hosted or
+production service. It exposes catalog and policy operations; customer/order
+records and raw source files have no browser endpoints. No external frontend
+framework, CDN, additional runtime dependency, or model account is required.
 
 ## Supplied materials
 
@@ -62,7 +100,7 @@ a BOM. Column order is flexible; missing, duplicate, or unexpected columns fail.
 The source files, including the internal PDF and challenge brief, are excluded from
 Git. The repository contains synthetic fixtures so tests work without the originals.
 All six CSVs are imported locally, including customers and orders; the development
-CLI exposes only catalog and policy queries. The SQLite database contains personal
+interfaces expose only catalog and policy queries. The SQLite database contains personal
 customer data and must remain local. Do not commit it or publish raw inputs.
 
 ## Configuration
@@ -96,9 +134,10 @@ python -m emporio_music policies "promocoes cumulativas"
 python -m emporio_music extract-policies
 ```
 
-The installed `emporio` command provides the same interface. Each executed
-subcommand identifies the pending LLM integration on stderr; results are JSON on
-stdout. Catalog queries read SQLite rather than hardcoded responses. Re-run `load`
+The installed `emporio` command provides the same interface. Executed subcommands
+identify the pending LLM integration on stderr. One-shot data commands return JSON
+on stdout; `serve` prints its local URL and keeps running until stopped. Catalog
+queries read SQLite rather than hardcoded responses. Re-run `load`
 after updating inputs. Policy search reads the configured PDF directly.
 
 `search` matches a literal name fragment, ignoring case and accents. `%` and `_`
@@ -141,6 +180,8 @@ src/emporio_music/
   policies.py     # PDF extraction, page references, lexical retrieval
   text.py         # Shared accent/case normalization
   cli.py          # Deterministic development commands
+  browser.py      # Loopback-only HTTP server using the existing data functions
+  web/            # Packaged HTML, CSS, and JavaScript for the local interface
 data/raw/         # Local unchanged source files (ignored)
 data/processed/   # Generated SQLite and extracted JSON (ignored)
 docs/reference/   # Local challenge brief (ignored)
@@ -177,8 +218,10 @@ catalog answers use only the supplied rows.
 ## Decisions and data limitations
 
 - **Small architecture:** SQLite handles relationships and filters; standard-library
-  modules handle orchestration. No agent framework, API server, vector database,
-  infrastructure service, or generic repository abstraction is needed for this stage.
+  modules handle orchestration. A small `http.server` adapter serves packaged browser
+  assets and calls the existing Python functions. No agent framework, external web
+  framework, vector database, infrastructure service, or generic repository
+  abstraction is needed for this stage.
 - **Reproducible snapshots:** all six files are validated before any write. A single
   SQLite transaction creates tables, replaces rows, and commits together. Repeating
   an import never appends duplicates; removed source rows disappear on the next
@@ -228,23 +271,36 @@ catalog answers use only the supplied rows.
 
 ```sh
 python -m pytest
+python -m pytest tests/test_browser.py
 python -m compileall -q src
+python -m emporio_music serve --help
 ```
 
 Tests use only synthetic fixtures and temporary databases. They cover repeatable
 imports, exact prices/stock, availability and effective-price filters, invalid or
 missing data, atomic failure behavior, and policy excerpts with page references.
+Browser integration tests make real HTTP requests to a temporary loopback server
+with synthetic inputs. They cover imports, catalog filters/details, policy page
+references, missing sources, rejected invalid requests, and source-file privacy.
 `tests/fixtures/build_policy_fixture.py` regenerates the synthetic PDF using only
 the standard library.
 
 The source-data CLI commands above require the original files. Windows execution
 is verified during development; Linux execution has not been run in this workspace.
-Verified with Python 3.13.15, pypdf 6.21.4, and pytest 9.2.0: **20 test cases passed**,
-package compilation succeeded, and `pip check` reported no broken requirements.
+The current project was verified with Python 3.13.15, pypdf 6.21.4, and pytest
+9.2.0: **30 test cases passed**, including 10 browser HTTP cases. Package
+compilation and JavaScript syntax checks succeeded; `pip check` reported no broken
+requirements. A distribution wheel was built and checked for bundled web assets.
 The installed CLI imported the originals twice with unchanged row counts, returned
 three available Yamaha products up to BRL 1000, read product 81 as BRL 599.90 with
 12 units, calculated product 90's active 18% offer as BRL 1967.18 from BRL 2399.00,
 retrieved `devolucao` from page 4, and exported all eight policy pages.
+The browser interface was exercised in the installed Chrome through Playwright:
+initial catalog loading, price/availability filters, product details, empty results,
+policy page references, reimport, and first-run database creation all passed.
+Desktop and 390-pixel mobile layouts were checked with no horizontal overflow or
+browser JavaScript errors. Playwright was used only for development verification;
+it is not an application dependency or a requirement for running the HTTP tests.
 
 ## Next steps
 
@@ -264,5 +320,6 @@ deliberate identity and privacy design before exposing it through future tools.
 ChatGPT was used for planning this staged project, as reported by the project owner.
 Codex was used for assisted implementation: reading the supplied materials,
 auditing CSV relationships and edge cases, writing the Python modules and synthetic
-fixtures, preparing documentation, and running/reviewing verification commands.
+fixtures, adding the local browser interface, preparing documentation, and
+running/reviewing verification commands.
 The application itself does not use ChatGPT, Codex, or another LLM at runtime yet.

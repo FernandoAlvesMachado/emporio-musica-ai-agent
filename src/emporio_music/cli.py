@@ -33,6 +33,9 @@ def _parser() -> argparse.ArgumentParser:
     policies.add_argument("--limit", type=int, default=5)
     extract = commands.add_parser("extract-policies", help="Export PDF text to page-referenced JSON.")
     extract.add_argument("--output", type=Path, default=Path("data/processed/policies.json"))
+    browser = commands.add_parser("serve", help="Start the local browser interface for catalog and policies.")
+    browser.add_argument("--port", type=int, default=8000)
+    browser.add_argument("--open-browser", action="store_true", help="Open the local interface in the default browser.")
     return parser
 
 
@@ -45,6 +48,11 @@ def main(argv: list[str] | None = None) -> int:
     print("Development CLI: LLM integration is pending.", file=sys.stderr)
     try:
         settings = Settings.from_environment(args.root)
+        if args.command == "serve":
+            from emporio_music.browser import serve
+
+            serve(settings, port=args.port, open_browser=args.open_browser)
+            return 0
         if args.command == "load":
             payload = asdict(import_data(settings.raw_dir, settings.database_path))
         elif args.command == "search":
