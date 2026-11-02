@@ -2,7 +2,10 @@
 
 This directory must contain three to five genuine English conversations before
 challenge delivery. No real-model conversations have been recorded or claimed yet:
-provider verification is currently **BLOCKED** by the missing Gemini API key.
+provider verification is currently **BLOCKED** by external generation failures.
+The local key was detected and an authenticated model-list request succeeded, but
+generation returned HTTP 503/UNAVAILABLE for the configured model; the explicit
+AI Studio alias diagnostic timed out. No genuine conversation was recorded.
 This README is a recording plan, not one of the required conversations.
 
 After configuring the key and loading the original data, start an English session:

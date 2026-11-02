@@ -30,6 +30,8 @@ function friendlyError(error, fallback) {
     authentication_error: "O provedor não aceitou a chave configurada. Confira a configuração local do Gemini.",
     provider_access_denied: "O Gemini recusou o acesso. Confira a chave local e as permissões do projeto no AI Studio.",
     model_unavailable: "O modelo configurado não está disponível para este projeto. Confira GEMINI_MODEL no .env.",
+    provider_unavailable: "O Gemini está temporariamente indisponível. Tente novamente mais tarde.",
+    model_timeout: "O Gemini não respondeu dentro do prazo. Tente novamente mais tarde.",
     session_limit: "O limite desta conversa foi atingido. Use Nova conversa para continuar.",
     session_closed: "Esta conversa foi encerrada. Use Nova conversa para continuar.",
     tool_limit: "A consulta precisou de muitas etapas. Tente uma pergunta mais específica.",

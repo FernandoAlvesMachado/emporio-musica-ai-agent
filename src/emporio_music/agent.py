@@ -57,8 +57,15 @@ class ChatSession:
                     "model_not_configured",
                 )
             from google import genai
+            from google.genai import types
 
-            client = genai.Client(api_key=self.configuration.api_key)
+            client = genai.Client(
+                api_key=self.configuration.api_key,
+                http_options=types.HttpOptions(
+                    timeout=int(self.configuration.timeout * 1000),
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                ),
+            )
         self._client = client
         self._tools = ToolRegistry(settings)
         self._history: list[dict] = []
@@ -84,12 +91,16 @@ class ChatSession:
             # Provider errors can include headers, prompts and key-bearing URLs.
             # Translate them only at this SDK boundary and never echo their text.
             status = getattr(error, "status_code", getattr(error, "code", None))
+            if isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower():
+                raise AgentError("The Gemini request timed out. Retry later or check provider connectivity.", "model_timeout") from None
             if status == 429:
                 raise AgentError("Gemini quota or rate limit reached. Check the account limits and try later.", "rate_limited") from None
             if status in {401, 403}:
                 raise AgentError("Gemini rejected access. Check the local API key and project permissions.", "provider_access_denied") from None
             if status == 404:
                 raise AgentError("The configured Gemini model is unavailable to this project. Check GEMINI_MODEL.", "model_unavailable") from None
+            if status in {500, 502, 503, 504}:
+                raise AgentError("Gemini is temporarily unavailable. Retry later; no simulated answer was produced.", "provider_unavailable") from None
             raise AgentError("The Gemini request failed. Check network access, model configuration and provider availability.", "model_error") from None
 
     @staticmethod

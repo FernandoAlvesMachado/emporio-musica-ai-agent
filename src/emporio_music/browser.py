@@ -384,6 +384,8 @@ class BrowserHandler(BaseHTTPRequestHandler):
                 "authentication_error": (503, "The model provider rejected the configured credentials."),
                 "provider_access_denied": (503, "Gemini rejected access. Check the local API key and project permissions."),
                 "model_unavailable": (503, "The configured Gemini model is unavailable. Check GEMINI_MODEL."),
+                "provider_unavailable": (503, "Gemini is temporarily unavailable. Try again later."),
+                "model_timeout": (504, "The Gemini request timed out. Try again later."),
                 "session_limit": (409, "The conversation limit was reached. Start a new conversation."),
                 "session_closed": (404, "This conversation has ended. Start a new conversation."),
                 "tool_limit": (422, "The tool-call limit was reached. Try a more focused question."),

@@ -115,7 +115,7 @@ def test_source_instructions_are_not_promoted_to_system_messages(settings, monke
     session.close()
 
 
-@pytest.mark.parametrize("status,code", [(401, "provider_access_denied"), (429, "rate_limited"), (404, "model_unavailable"), (500, "model_error")])
+@pytest.mark.parametrize("status,code", [(401, "provider_access_denied"), (429, "rate_limited"), (404, "model_unavailable"), (500, "provider_unavailable"), (503, "provider_unavailable")])
 def test_provider_errors_never_echo_credentials_or_request_bodies(settings, status, code):
     failure = RuntimeError("private-key-and-customer-data-must-never-appear")
     failure.status_code = status
@@ -172,3 +172,20 @@ def test_env_file_is_loaded_but_shell_values_take_precedence(tmp_path, monkeypat
     monkeypatch.setenv("EMPORIO_MAX_TURNS", "0")
     with pytest.raises(ValueError, match="session turns"):
         ModelSettings.from_environment(tmp_path)
+
+
+def test_real_client_construction_bounds_timeout_and_disables_hidden_retries(settings, monkeypatch):
+    from google import genai
+
+    captured = {}
+    client = ScriptedGemini()
+
+    def create_client(**arguments):
+        captured.update(arguments)
+        return client
+
+    monkeypatch.setattr(genai, "Client", create_client)
+    session = ChatSession(settings, model_settings=ModelSettings(api_key="synthetic-test-value"))
+    assert captured["http_options"].timeout == 45000
+    assert captured["http_options"].retry_options.attempts == 1
+    session.close()

@@ -9,8 +9,10 @@ integration uses Google's Gemini API, a conversational terminal interface, and
 bounded, nonpersistent conversation context. Implementation and verification are
 tracked separately; a working data query is not proof of a functioning AI agent.
 
-**Real-model verification is currently BLOCKED by the absence of a configured
-Gemini API key.** Isolated tests and deterministic source checks do not prove that
+**Real-model verification is currently BLOCKED by external provider failures.**
+A key is now present locally;
+the configured-model probe returned HTTP 503/UNAVAILABLE and the explicitly tested
+AI Studio alias timed out. Isolated tests and deterministic source checks do not prove that
 the external integration works. No real conversation transcripts are claimed.
 See [the validation report](docs/validation_report.md) for evidence and remaining
 delivery requirements.
@@ -407,10 +409,10 @@ the standard library.
 The source-data CLI commands above require the original files. Windows execution
 is verified during development; Linux execution has not been run in this workspace.
 The chatbot implementation was verified with Python 3.13.15, pypdf 6.21.4,
-google-genai 2.34.0, python-dotenv 1.2.4, and pytest 9.2.0: **60 test cases passed**.
+google-genai 2.34.0, python-dotenv 1.2.4, and pytest 9.2.0: **62 test cases passed**.
 These include scripted-provider, native-SDK mocked HTTP, and browser-session tests;
 none calls Gemini. A clean temporary virtual environment also installed the package,
-loaded/reimported all original inputs, passed all 60 tests, and served the browser
+loaded/reimported all original inputs, passed all tests, and served the browser
 interface successfully. Chat startup in that credential-free environment explicitly
 reported missing configuration. Python compilation, JavaScript syntax, and
 `pip check` passed. The original 30-test baseline is recorded in the validation report.
@@ -467,7 +469,12 @@ alone is not correctness: compare the transcript with the independent source val
 in `docs/validation_report.md` before adding a reviewed example to the delivery folder.
 
 External verification and real transcripts remain blocked until a provider call
-succeeds. The public GitHub repository is visible, but its content was still empty
+succeeds. The configured key was accepted for model listing (HTTP 200, compared
+with HTTP 403 without a key). Actual generation returned HTTP 503/UNAVAILABLE or
+timed out; neither the configured model nor the explicitly tested AI Studio alias
+produced a conversation. Provider requests now use one SDK attempt and the
+configured per-request timeout, with explicit unavailable/timeout errors and no
+automatic model fallback. The public GitHub repository is visible, but its content was still empty
 when audited; local commits alone do not publish it. The project is not ready for
 delivery while those mandatory checks and deliverables remain outstanding.
 
