@@ -4,12 +4,24 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
 from emporio_music.config import ModelSettings, Settings
 from emporio_music.prompts import system_instruction
 from emporio_music.tools import TOOL_DEFINITIONS, ToolRegistry
+
+
+_SYSTEM_DELIMITER_PATTERN = re.compile(
+    r"(<\s*/?\s*system\s*>|\[\s*/?\s*system\s*\]|<<\s*/?\s*sys\s*>>|```+\s*system)",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_customer_input(text: str) -> str:
+    """Neutralize structural delimiter tokens that attempt to spoof system roles."""
+    return _SYSTEM_DELIMITER_PATTERN.sub(lambda match: f"[{match.group(0).strip('<>[]{}`')}]", text).strip()
 
 
 class AgentError(ValueError):
@@ -74,6 +86,14 @@ class ChatSession:
 
     def _request(self, history: list[dict], first_round: bool):
         try:
+            generation_config: dict[str, Any] = {
+                "tool_choice": "any" if first_round else "auto",
+                "max_output_tokens": 4096,
+            }
+            if self.configuration.thinking_budget is not None:
+                generation_config["thinking_config"] = {
+                    "thinking_budget": self.configuration.thinking_budget,
+                }
             return self._client.interactions.create(
                 model=self.configuration.model,
                 input=history,
@@ -81,10 +101,7 @@ class ChatSession:
                 tools=TOOL_DEFINITIONS,
                 store=False,
                 automatic_continuation=False,
-                generation_config={
-                    "tool_choice": "any" if first_round else "auto",
-                    "max_output_tokens": 4096,
-                },
+                generation_config=generation_config,
                 timeout=self.configuration.timeout,
             )
         except Exception as error:
@@ -116,8 +133,11 @@ class ChatSession:
             raise AgentError("Messages must contain 1 to 4000 characters.", "invalid_request")
         if self._turns >= self.configuration.max_turns:
             raise AgentError("The session turn limit was reached. Start a new conversation.", "session_limit")
+        clean_text = _sanitize_customer_input(message)
+        if not clean_text:
+            raise AgentError("Messages must contain 1 to 4000 characters.", "invalid_request")
         history = copy.deepcopy(self._history)
-        history.append({"type": "user_input", "content": [{"type": "text", "text": message.strip()}]})
+        history.append({"type": "user_input", "content": [{"type": "text", "text": clean_text}]})
         traces: list[dict] = []
         for round_number in range(self.configuration.max_tool_rounds + 1):
             response = self._request(history, first_round=not traces)

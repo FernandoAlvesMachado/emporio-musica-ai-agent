@@ -3,7 +3,7 @@
 @media(min-width:1400px){.product-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:1100px){.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.intro-art{margin-right:15px}.workspace{gap:25px;grid-template-columns:220px minmax(0,1fr)}.stats{grid-template-columns:1fr 1fr 1fr}.stage-note{grid-column:1/-1;padding:11px 0 0 18px;border-top:1px solid var(--line)}.stage-note>span{top:11px}.stats>div:last-of-type{border:0}.stage-note br{display:none}.workspace-caption{display:none}}
 @media(max-width:700px){.site-header{padding:20px 5%}.header-right{gap:10px}.local-badge{display:none}.button-outline{font-size:10px;padding:10px}.brand{font-size:21px;gap:8px}.brand-second{font-size:19px}.brand-mark{width:36px;height:40px}.brand-mark svg{width:25px}.intro{padding:35px 0 26px;gap:10px}.intro h1{font-size:38px;letter-spacing:-1.6px}.intro-art{display:none}.intro-copy{font-size:12px}.stats{gap:11px;padding:18px 0}.stat-value{font-size:25px}.stat-label{font-size:8px;line-height:1.6;max-width:90px}.stats>div{gap:8px}.stage-note{font-size:9px;padding-top:12px}.workspace-heading{margin-top:20px}.workspace{grid-template-columns:1fr;gap:25px;margin-top:20px}.filter-panel{padding:20px}.filter-panel h2{font-size:25px;margin-bottom:20px}.filter-panel h2 br{display:none}.filter-panel form{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;align-items:end}.filter-panel label{margin:0;grid-column:1/-1}.filter-panel #product-name,.filter-panel #policy-query{grid-column:1/-1}.filter-panel label[for=max-price]{grid-column:1;grid-row:3;margin-top:8px}.money-input{grid-column:1;grid-row:4}.filter-panel label[for=availability]{grid-column:2;grid-row:3;margin-top:8px}#availability{grid-column:2;grid-row:4}.field-help#price-help{grid-column:1/-1;margin:0}.filter-panel .button{grid-column:1/-1;margin-top:7px!important}.filter-panel .text-button{grid-column:1/-1;margin-top:2px}.filter-tip{margin-top:17px;padding-top:13px}.filter-tip p{font-size:10px}.filter-tip>span{font-size:20px}.results-heading h2{font-size:27px}.product-grid{gap:11px}.product-card{padding:13px}.card-name{font-size:17px}.card-category{font-size:7px;letter-spacing:.5px}.price-current{font-size:15px}.card-detail-button{width:28px;height:28px;font-size:16px}.instrument-motif{height:65px}.site-footer{align-items:flex-start;flex-direction:column;gap:10px;margin-top:30px;padding:20px 0}.footer-location{margin-left:8px}.policy-card{padding:18px}.policy-excerpt{font-size:16px}.suggestion-list{margin-top:17px}.panel-copy{margin-bottom:20px}dialog{padding:20px}#detail-name{font-size:29px}.spec-list{grid-template-columns:1fr 1fr}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}.chat-skeleton-line{animation:none!important;background:#edf0e8!important}}
 
 /* Conversational interface. Data returned by the model is rendered as plain text. */
 .chat-workspace {
@@ -148,6 +148,38 @@
   line-height: 1.85;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.chat-message-skeleton {
+  min-width: 220px;
+  width: 320px;
+  background: var(--white);
+  border-color: #dbe0d6;
+}
+.chat-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 4px 0 2px;
+}
+.chat-skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #edf0e8 25%, #f6f8f3 50%, #edf0e8 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s infinite ease-in-out;
+}
+.chat-skeleton-line:nth-child(1) {
+  width: 92%;
+}
+.chat-skeleton-line:nth-child(2) {
+  width: 100%;
+}
+.chat-skeleton-line:nth-child(3) {
+  width: 65%;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 .chat-sources {
   display: flex;

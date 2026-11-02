@@ -306,6 +306,24 @@ function setChatBusy(busy) {
   select("#chat-send").firstChild.textContent = busy ? "Consultando… " : "Enviar ";
 }
 
+function addChatSkeleton() {
+  select("#chat-welcome").hidden = true;
+  const message = createElement("article", "chat-message chat-message-assistant chat-message-skeleton");
+  message.setAttribute("aria-live", "polite");
+  message.setAttribute("aria-label", "Processando resposta...");
+  message.append(createElement("span", "chat-message-author", "Empório da Música · Gemini"));
+  const body = createElement("div", "chat-skeleton-body");
+  body.append(
+    createElement("div", "chat-skeleton-line"),
+    createElement("div", "chat-skeleton-line"),
+    createElement("div", "chat-skeleton-line")
+  );
+  message.append(body);
+  select("#chat-messages").append(message);
+  message.scrollIntoView({block: "nearest"});
+  return message;
+}
+
 function addChatMessage(role, text, traces = []) {
   select("#chat-welcome").hidden = true;
   const message = createElement("article", `chat-message chat-message-${role}`);
@@ -342,6 +360,7 @@ async function sendChat(event) {
   const message = input.value.trim();
   if (!message) { input.focus(); return; }
   const pending = addChatMessage("user", message);
+  const skeleton = addChatSkeleton();
   setChatBusy(true);
   select("#chat-feedback").classList.remove("is-error");
   select("#chat-feedback").textContent = "Consultando o atendimento e as fontes necessárias…";
@@ -350,10 +369,12 @@ async function sendChat(event) {
   try {
     const response = await request("/api/chat", {method: "POST", headers: {"Content-Type": "application/json", "X-Emporio-Client": "browser"}, body: JSON.stringify(payload)});
     chatState.sessionId = response.session_id;
+    skeleton.remove();
     addChatMessage("assistant", response.reply, response.tool_calls || []);
     input.value = "";
     select("#chat-feedback").textContent = "Você pode continuar a conversa.";
   } catch (error) {
+    skeleton.remove();
     pending.remove();
     select("#chat-welcome").hidden = select("#chat-messages .chat-message") !== null;
     select("#chat-feedback").classList.add("is-error");

@@ -45,11 +45,12 @@ class Settings:
 @dataclass(frozen=True)
 class ModelSettings:
     api_key: str = field(default="", repr=False)
-    model: str = "gemini-3.8-flash"
+    model: str = "gemini-3.1-flash-lite"
     language: str = "pt-BR"
     timeout: float = 45.0
     max_tool_rounds: int = 6
     max_turns: int = 20
+    thinking_budget: int | None = 1024
 
     @classmethod
     def from_environment(cls, project_root: Path | None = None) -> "ModelSettings":
@@ -67,7 +68,21 @@ class ModelSettings:
             raise ValueError("Tool rounds must be 1..10 and session turns must be 1..50.")
         if language not in {"pt-BR", "en"}:
             raise ValueError("Chat language must be pt-BR or en.")
-        model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        thinking_raw = os.environ.get("EMPORIO_THINKING_BUDGET", "1024").strip()
+        thinking_budget: int | None = 1024
+        if thinking_raw:
+            if thinking_raw.lower() in {"none", "off", "disabled"}:
+                thinking_budget = None
+            else:
+                try:
+                    thinking_budget = int(thinking_raw)
+                    if not 0 <= thinking_budget <= 8192:
+                        raise ValueError
+                except ValueError as error:
+                    raise ValueError("EMPORIO_THINKING_BUDGET must be an integer between 0 and 8192 or 'none'.") from error
+        else:
+            thinking_budget = None
+        model = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
         if not model or len(model) > 150:
             raise ValueError("GEMINI_MODEL must contain a valid model identifier.")
         api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -77,4 +92,5 @@ class ModelSettings:
             api_key=api_key,
             model=model, language=language, timeout=timeout,
             max_tool_rounds=rounds, max_turns=turns,
+            thinking_budget=thinking_budget,
         )
