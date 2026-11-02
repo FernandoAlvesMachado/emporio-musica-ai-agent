@@ -3,6 +3,7 @@
 const select = (selector, scope = document) => scope.querySelector(selector);
 const statusLabels = {active: "Ativo", discontinued: "Descontinuado", coming_soon: "Em breve"};
 const state = {databaseReady: false, policiesReady: false, catalogRequest: null, policyRequest: null, detailRequest: null};
+const chatState = {sessionId: null, busy: false, configured: false};
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -23,6 +24,20 @@ function friendlyError(error, fallback) {
     invalid_request: "Confira os campos da busca e tente novamente.",
     source_error: "Não foi possível ler os dados da loja. Confira se os arquivos fornecidos estão nas pastas configuradas.",
     internal_error: "Não foi possível concluir a consulta. Tente novamente.",
+    model_not_configured: "Configure GEMINI_API_KEY no arquivo .env local e reinicie o servidor para conversar com o Gemini.",
+    rate_limited: "A cota ou o limite de solicitações do modelo foi atingido. Tente novamente mais tarde.",
+    rate_limit: "A cota ou o limite de solicitações do modelo foi atingido. Tente novamente mais tarde.",
+    authentication_error: "O provedor não aceitou a chave configurada. Confira a configuração local do Gemini.",
+    provider_access_denied: "O Gemini recusou o acesso. Confira a chave local e as permissões do projeto no AI Studio.",
+    model_unavailable: "O modelo configurado não está disponível para este projeto. Confira GEMINI_MODEL no .env.",
+    session_limit: "O limite desta conversa foi atingido. Use Nova conversa para continuar.",
+    session_closed: "Esta conversa foi encerrada. Use Nova conversa para continuar.",
+    tool_limit: "A consulta precisou de muitas etapas. Tente uma pergunta mais específica.",
+    empty_response: "O Gemini não retornou uma resposta com consulta às fontes. Tente novamente.",
+    incomplete_response: "O Gemini não concluiu a resposta. Tente uma pergunta mais curta.",
+    model_error: "O Gemini não conseguiu concluir a resposta. Confira a configuração local e tente novamente.",
+    session_not_found: "Esta conversa expirou ou foi encerrada. Clique em Nova conversa para começar de novo.",
+    session_limit: "O limite de conversas locais foi atingido. Encerre uma conversa ou reinicie a aplicação.",
   };
   return messages[error.code] || fallback;
 }
@@ -265,9 +280,129 @@ function activateTab(tab, moveFocus = false) {
   if (moveFocus) tab.focus();
 }
 
+async function refreshChatStatus() {
+  try {
+    const status = await request("/api/chat/status");
+    chatState.configured = status.configured;
+    select("#chat-provider-status").textContent = status.configured ? `Gemini · ${status.model} · chave configurada` : `Gemini · ${status.model} · configuração pendente`;
+    select("#chat-setup").hidden = status.configured;
+    select("#chat-setup").textContent = "Para receber respostas reais, configure GEMINI_API_KEY no .env local e reinicie o servidor. Nenhuma resposta simulada será usada.";
+  } catch (error) {
+    select("#chat-provider-status").textContent = "Não foi possível verificar a configuração do Gemini.";
+    select("#chat-setup").hidden = false;
+    select("#chat-setup").textContent = friendlyError(error, "Confira se a aplicação está em execução e tente novamente.");
+  }
+}
+
+function setChatBusy(busy) {
+  chatState.busy = busy;
+  select("#chat-send").disabled = busy;
+  select("#new-chat").disabled = busy;
+  select("#chat-message").disabled = busy;
+  select("#chat-messages").setAttribute("aria-busy", String(busy));
+  document.querySelectorAll("[data-chat-prompt]").forEach((button) => { button.disabled = busy; });
+  select("#chat-send").firstChild.textContent = busy ? "Consultando… " : "Enviar ";
+}
+
+function addChatMessage(role, text, traces = []) {
+  select("#chat-welcome").hidden = true;
+  const message = createElement("article", `chat-message chat-message-${role}`);
+  message.append(createElement("span", "chat-message-author", role === "user" ? "Você" : "Empório da Música · Gemini"));
+  message.append(createElement("p", "chat-message-text", text));
+  const references = new Set();
+  const labels = {
+    list_categories: "Categorias consultadas",
+    search_products: "Catálogo consultado",
+    get_product: "Produto consultado",
+    search_policies: "Manual consultado",
+    get_policy_pages: "Páginas do manual consultadas",
+    quote_payment: "Condições de pagamento consultadas",
+  };
+  traces.forEach((trace) => {
+    references.add(labels[trace.name] || "Fonte consultada");
+    (trace.sources || []).forEach((source) => references.add(source.replace(/, page (\d+)$/, ", página $1")));
+  });
+  if (references.size) {
+    const sources = createElement("div", "chat-sources");
+    sources.setAttribute("aria-label", "Fontes consultadas nesta resposta");
+    references.forEach((reference) => sources.append(createElement("span", "chat-source", reference)));
+    message.append(sources);
+  }
+  select("#chat-messages").append(message);
+  message.scrollIntoView({block: "nearest"});
+  return message;
+}
+
+async function sendChat(event) {
+  if (event) event.preventDefault();
+  if (chatState.busy) return;
+  const input = select("#chat-message");
+  const message = input.value.trim();
+  if (!message) { input.focus(); return; }
+  const pending = addChatMessage("user", message);
+  setChatBusy(true);
+  select("#chat-feedback").classList.remove("is-error");
+  select("#chat-feedback").textContent = "Consultando o atendimento e as fontes necessárias…";
+  const payload = {message};
+  if (chatState.sessionId) payload.session_id = chatState.sessionId;
+  try {
+    const response = await request("/api/chat", {method: "POST", headers: {"Content-Type": "application/json", "X-Emporio-Client": "browser"}, body: JSON.stringify(payload)});
+    chatState.sessionId = response.session_id;
+    addChatMessage("assistant", response.reply, response.tool_calls || []);
+    input.value = "";
+    select("#chat-feedback").textContent = "Você pode continuar a conversa.";
+  } catch (error) {
+    pending.remove();
+    select("#chat-welcome").hidden = select("#chat-messages .chat-message") !== null;
+    select("#chat-feedback").classList.add("is-error");
+    select("#chat-feedback").textContent = friendlyError(error, "Não foi possível concluir a conversa. Confira se o servidor está em execução e tente novamente.");
+  } finally {
+    setChatBusy(false);
+    input.focus({preventScroll: true});
+  }
+}
+
+async function resetChat() {
+  if (chatState.busy) return;
+  setChatBusy(true);
+  try {
+    if (chatState.sessionId) {
+      await request("/api/chat/reset", {method: "POST", headers: {"Content-Type": "application/json", "X-Emporio-Client": "browser"}, body: JSON.stringify({session_id: chatState.sessionId})});
+    }
+  } catch (error) {
+    if (error.code !== "session_not_found") {
+      select("#chat-feedback").classList.add("is-error");
+      select("#chat-feedback").textContent = "Não foi possível confirmar o encerramento. Confira a conexão e tente novamente.";
+      setChatBusy(false);
+      return;
+    }
+  }
+  chatState.sessionId = null;
+  select("#chat-messages").querySelectorAll(".chat-message").forEach((message) => message.remove());
+  select("#chat-welcome").hidden = false;
+  select("#chat-message").value = "";
+  select("#chat-feedback").classList.remove("is-error");
+  select("#chat-feedback").textContent = "Nova conversa pronta. O contexto da conversa anterior foi encerrado.";
+  setChatBusy(false);
+  await refreshChatStatus();
+  select("#chat-message").focus({preventScroll: true});
+}
+
 select("#catalog-form").addEventListener("submit", searchProducts);
 select("#policy-form").addEventListener("submit", searchPolicies);
 select("#import-button").addEventListener("click", importData);
+select("#chat-form").addEventListener("submit", sendChat);
+select("#new-chat").addEventListener("click", resetChat);
+select("#chat-message").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    sendChat();
+  }
+});
+document.querySelectorAll("[data-chat-prompt]").forEach((button) => button.addEventListener("click", () => {
+  select("#chat-message").value = button.dataset.chatPrompt;
+  select("#chat-message").focus();
+}));
 select("#clear-filters").addEventListener("click", () => { select("#catalog-form").reset(); select("#max-price").setCustomValidity(""); searchProducts(); });
 select("#max-price").addEventListener("input", () => select("#max-price").setCustomValidity(""));
 select("#close-dialog").addEventListener("click", () => select("#product-dialog").close());
@@ -291,3 +426,4 @@ refreshStatus().then(() => searchProducts()).catch((error) => {
   showNotice(friendlyError(error, "Não foi possível conectar ao servidor local. Confira se a aplicação está em execução e recarregue a página."), true);
   showState("#catalog-message", "A consulta ainda não está disponível.", "Confira a conexão com a aplicação local e recarregue a página.", {error: true});
 });
+refreshChatStatus();

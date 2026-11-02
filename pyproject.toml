@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "emporio-musica-ai-agent"
 version = "0.1.0"
-description = "Deterministic catalog and policy foundation for the Artefact AI Engineer challenge"
+description = "Source-grounded Gemini customer-service agent for the Artefact AI Engineer challenge"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["pypdf>=6.0,<7"]
+dependencies = ["pypdf>=6.0,<7", "google-genai>=2.34,<3", "python-dotenv>=1.2,<2"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]

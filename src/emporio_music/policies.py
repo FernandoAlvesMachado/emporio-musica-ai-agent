@@ -107,6 +107,23 @@ def search_policies(pdf_path: Path, query: str, limit: int = 5) -> list[PolicyMa
     ]
 
 
+def get_policy_pages(pdf_path: Path, pages: list[int]) -> list[PolicyMatch]:
+    """Retrieve complete physical pages when a bounded excerpt omits conditions."""
+    if not isinstance(pages, list) or not 1 <= len(pages) <= 3:
+        raise ValueError("Request between one and three policy pages.")
+    if any(not isinstance(page, int) or isinstance(page, bool) or page <= 0 for page in pages):
+        raise ValueError("Policy page numbers must be positive integers.")
+    if len(set(pages)) != len(pages):
+        raise ValueError("Policy page numbers must not be repeated.")
+    extracted = extract_policy_pages(pdf_path)
+    if any(page > len(extracted) for page in pages):
+        raise ValueError(f"The policy PDF contains {len(extracted)} pages.")
+    return [
+        PolicyMatch(page=number, text=extracted[number - 1].text, source=Path(pdf_path).name)
+        for number in pages
+    ]
+
+
 def export_policy_pages(pdf_path: Path, output_path: Path) -> int:
     """Write extracted text and 1-based page references to a UTF-8 JSON file."""
     pdf_path, output_path = Path(pdf_path), Path(output_path)

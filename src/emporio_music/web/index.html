@@ -21,7 +21,7 @@
 
   <main id="main-content" class="page-shell">
     <section class="intro" aria-labelledby="page-title">
-      <div><p class="eyebrow">PRÉVIA DE ATENDIMENTO</p><h1 id="page-title">Toda boa música<br>começa com uma escolha<span>.</span></h1><p class="intro-copy">Explore instrumentos, confira a disponibilidade<br class="desktop-break"> e encontre as informações da loja.</p></div>
+      <div><p class="eyebrow">PRÉVIA DE ATENDIMENTO</p><h1 id="page-title">Toda boa música<br>começa com uma escolha<span>.</span></h1><p class="intro-copy">Converse sobre instrumentos, confira a disponibilidade<br class="desktop-break"> e encontre as informações da loja.</p></div>
       <div class="intro-art" aria-hidden="true"><div class="record"><div class="record-label"><svg viewBox="0 0 32 32" fill="none"><path d="M7 22V10m6 16V6m6 17V9m6 11v-8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></div></div><span class="art-caption">SUA MÚSICA COMEÇA AQUI</span></div>
     </section>
 
@@ -29,14 +29,52 @@
       <div><span id="product-count" class="stat-value">—</span><span class="stat-label">instrumentos no catálogo</span></div>
       <div><span id="available-count" class="stat-value">—</span><span class="stat-label">disponíveis para tocar</span></div>
       <div><span id="promotion-count" class="stat-value">—</span><span class="stat-label">promoções ativas nos dados</span></div>
-      <p class="stage-note"><span aria-hidden="true">✦</span> Consultas reais aos dados da loja.<br> O atendimento com IA chega na próxima etapa.</p>
+      <p class="stage-note"><span aria-hidden="true">✦</span> Consultas aos dados da loja.<br> Chat com Gemini, mediante configuração.</p>
     </section>
 
     <div id="global-message" class="notice" role="status" hidden></div>
 
-    <div class="workspace-heading"><div class="tabs" role="tablist" aria-label="Área de consulta"><button id="catalog-tab" class="tab" role="tab" aria-selected="true" aria-controls="catalog-panel" tabindex="0" type="button">Catálogo <span aria-hidden="true">↗</span></button><button id="policies-tab" class="tab" role="tab" aria-selected="false" aria-controls="policies-panel" tabindex="-1" type="button">Políticas da loja <span aria-hidden="true">↗</span></button></div><span class="workspace-caption">INFORMAÇÃO PARA ESCOLHER MELHOR</span></div>
+    <div class="workspace-heading">
+      <div class="tabs" role="tablist" aria-label="Área de consulta">
+        <button id="chat-tab" class="tab" role="tab" aria-selected="true" aria-controls="chat-panel" tabindex="0" type="button">Conversar <span aria-hidden="true">↗</span></button>
+        <button id="catalog-tab" class="tab" role="tab" aria-selected="false" aria-controls="catalog-panel" tabindex="-1" type="button">Catálogo <span aria-hidden="true">↗</span></button>
+        <button id="policies-tab" class="tab" role="tab" aria-selected="false" aria-controls="policies-panel" tabindex="-1" type="button">Políticas da loja <span aria-hidden="true">↗</span></button>
+      </div>
+      <span class="workspace-caption">INFORMAÇÃO PARA ESCOLHER MELHOR</span>
+    </div>
 
-    <section id="catalog-panel" role="tabpanel" aria-labelledby="catalog-tab" class="workspace">
+    <section id="chat-panel" role="tabpanel" aria-labelledby="chat-tab" class="workspace chat-workspace">
+      <aside class="chat-guide">
+        <div class="section-label"><span class="small-rule"></span> VAMOS ENCONTRAR SEU SOM</div>
+        <h2>Uma boa conversa.<br>Uma escolha melhor.</h2>
+        <p>Conte o que procura. O atendimento pode consultar o catálogo e o manual para ajudar você.</p>
+        <div class="chat-suggestions" aria-label="Sugestões de perguntas">
+          <button type="button" data-chat-prompt="Quais violões estão disponíveis até R$ 1000?">Violões até R$ 1.000 <span aria-hidden="true">↗</span></button>
+          <button type="button" data-chat-prompt="Qual é o preço e a disponibilidade do Takamine GD20?">Preço e disponibilidade <span aria-hidden="true">↗</span></button>
+          <button type="button" data-chat-prompt="Comprei um instrumento e quero devolver. Como funciona?">Trocas e devoluções <span aria-hidden="true">↗</span></button>
+        </div>
+        <p class="chat-guide-footnote">As informações refletem os arquivos carregados. A conversa não realiza compras, reservas ou devoluções.</p>
+      </aside>
+      <div class="chat-area">
+        <div class="chat-heading">
+          <div><p class="eyebrow">ATENDIMENTO DA LOJA</p><h2>Vamos conversar?</h2></div>
+          <button id="new-chat" class="button button-outline" type="button">Nova conversa <span aria-hidden="true">↻</span></button>
+        </div>
+        <p id="chat-provider-status" class="chat-provider-status" role="status">Verificando a configuração do Gemini…</p>
+        <div id="chat-setup" class="notice" role="status" hidden></div>
+        <div id="chat-messages" class="chat-messages" role="log" aria-label="Mensagens da conversa" aria-live="polite" aria-relevant="additions" aria-busy="false">
+          <div id="chat-welcome" class="chat-welcome"><span aria-hidden="true">♪</span><h3>Sua conversa começa aqui.</h3><p>Pergunte sobre instrumentos, preços, disponibilidade ou políticas da loja.</p><p class="chat-intro-label">As respostas aparecerão após a consulta ao modelo.</p></div>
+        </div>
+        <p id="chat-feedback" class="chat-feedback" role="status" aria-live="polite"></p>
+        <form id="chat-form">
+          <label for="chat-message">Sua mensagem</label>
+          <textarea id="chat-message" rows="3" maxlength="4000" required placeholder="Ex.: procuro um violão para começar, até R$ 1.000…" aria-describedby="chat-input-help"></textarea>
+          <div class="chat-compose-bottom"><p id="chat-input-help">Enter envia · Shift + Enter quebra a linha<br>O histórico fica apenas nesta sessão.</p><button id="chat-send" class="button button-primary" type="submit">Enviar <span aria-hidden="true">→</span></button></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="catalog-panel" role="tabpanel" aria-labelledby="catalog-tab" class="workspace" hidden>
       <aside class="filter-panel">
         <div class="section-label"><span class="small-rule"></span> ENCONTRE SEU SOM</div>
         <h2>Qual é a sua<br> próxima escolha?</h2>

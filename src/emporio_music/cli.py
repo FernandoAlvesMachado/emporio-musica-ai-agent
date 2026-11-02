@@ -1,4 +1,4 @@
-"""Development CLI: real data queries, with no language-model integration."""
+"""Conversational Gemini CLI and deterministic development data commands."""
 
 import argparse
 import json
@@ -14,10 +14,13 @@ from emporio_music.policies import export_policy_pages, search_policies
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Emporio da Musica development CLI. LLM integration is pending."
+        description="Emporio da Musica: Gemini conversations and source-data tools."
     )
     parser.add_argument("--root", type=Path, help="Project root for relative data paths (default: working directory).")
     commands = parser.add_subparsers(dest="command", required=True)
+    chat = commands.add_parser("chat", help="Start a real Gemini customer-service conversation.")
+    chat.add_argument("--language", choices=("pt-BR", "en"), help="Response language (default: configured language).")
+    chat.add_argument("--show-tools", action="store_true", help="Print actual tool names after each reply.")
     commands.add_parser("load", help="Validate and atomically import all six CSV files into SQLite.")
     search = commands.add_parser("search", help="Search product names and filter actual catalog data.")
     search.add_argument("name", nargs="?", default="", help="Literal name fragment, ignoring case and accents.")
@@ -39,20 +42,55 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_chat(settings: Settings, language: str | None = None, show_tools: bool = False) -> int:
+    from emporio_music.agent import AgentError, ChatSession
+
+    session = ChatSession(settings, language=language)
+    print("Emporio da Musica | Gemini chat")
+    print("Type /reset for a new conversation or /exit to leave. No chat history is saved to disk.")
+    try:
+        while True:
+            try:
+                message = input("You: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            if message.lower() in {"/exit", "/quit"}:
+                break
+            if message.lower() == "/reset":
+                session.reset()
+                print("New conversation started.")
+                continue
+            if not message:
+                continue
+            try:
+                reply = session.send(message)
+                print(f"Emporio: {reply.text}\n")
+                if show_tools:
+                    print("Sources queried: " + ", ".join(call["name"] for call in reply.tool_calls))
+            except AgentError as error:
+                print(f"Error [{error.code}]: {error}", file=sys.stderr)
+    finally:
+        session.close()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Windows redirected streams may default to a legacy encoding. Preserve accents.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     args = _parser().parse_args(argv)
-    print("Development CLI: LLM integration is pending.", file=sys.stderr)
     try:
         settings = Settings.from_environment(args.root)
+        if args.command == "chat":
+            return run_chat(settings, args.language, args.show_tools)
         if args.command == "serve":
             from emporio_music.browser import serve
 
             serve(settings, port=args.port, open_browser=args.open_browser)
             return 0
+        print("Development data CLI: use 'chat' for Gemini conversations.", file=sys.stderr)
         if args.command == "load":
             payload = asdict(import_data(settings.raw_dir, settings.database_path))
         elif args.command == "search":

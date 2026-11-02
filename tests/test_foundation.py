@@ -214,7 +214,7 @@ def test_cli_load_search_and_policy_commands_use_actual_synthetic_sources(
     arguments = ["--root", str(tmp_path)]
     assert main([*arguments, "load"]) == 0
     output = capsys.readouterr()
-    assert "LLM integration is pending" in output.err
+    assert "Development data CLI" in output.err
     assert json.loads(output.out)["counts"]["products"] == 5
     assert main([*arguments, "search", "violao", "--max-price", "539.91", "--available"]) == 0
     assert [row["product_id"] for row in json.loads(capsys.readouterr().out)] == [1]

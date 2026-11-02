@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import time
 import webbrowser
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
+from threading import Lock, RLock
+from typing import Any, Callable
 from urllib.parse import parse_qs, urlsplit
+from uuid import UUID, uuid4
 
 from emporio_music.catalog import (
     CatalogError,
@@ -27,21 +31,155 @@ _ASSETS = {
     "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
 
+_SESSION_TTL = 30 * 60
+_MAX_SESSIONS = 50
+
+
+class ChatRequestError(ValueError):
+    """A safe local chat request error, without provider details."""
+
+    def __init__(self, message: str, code: str = "invalid_request", status: int = 400):
+        super().__init__(message)
+        self.code = code
+        self.status = status
+
+
+@dataclass
+class _Conversation:
+    session: Any
+    last_used: float = field(default_factory=time.monotonic)
+    lock: Any = field(default_factory=Lock)
+    closed: bool = False
+
+
+def _public_tool_traces(traces: list[dict]) -> list[dict]:
+    """Expose consulted source references, never raw tool arguments or payloads."""
+    public = []
+    for trace in traces:
+        if not isinstance(trace, dict):
+            continue
+        sources = set()
+
+        def collect(value: Any, source: str | None = None, depth: int = 0) -> None:
+            if depth > 5:
+                return
+            if isinstance(value, dict):
+                filename = value.get("source", source)
+                if not isinstance(filename, str):
+                    filename = source
+                page = value.get("page")
+                if filename and isinstance(page, int) and not isinstance(page, bool):
+                    sources.add(f"{filename}, page {page}")
+                for child in value.values():
+                    collect(child, filename, depth + 1)
+            elif isinstance(value, list):
+                for child in value[:20]:
+                    collect(child, source, depth + 1)
+
+        collect(trace.get("result"))
+        public.append({"name": str(trace.get("name", ""))[:80], "sources": sorted(sources)})
+    return public
+
 
 class BrowserServer(ThreadingHTTPServer):
     """Local development server; raw source files are never served."""
 
     daemon_threads = True
 
-    def __init__(self, settings: Settings, port: int):
+    def __init__(self, settings: Settings, port: int, session_factory: Callable | None = None):
         if not isinstance(port, int) or isinstance(port, bool) or not 0 <= port <= 65535:
             raise ValueError("Port must be an integer between 0 and 65535.")
         self.settings = settings
+        self.session_factory = session_factory
+        self.conversations: dict[str, _Conversation] = {}
+        self.conversations_lock = RLock()
         super().__init__(("127.0.0.1", port), BrowserHandler)
         actual_port = self.server_address[1]
         self.allowed_hosts = {f"127.0.0.1:{actual_port}", f"localhost:{actual_port}"}
         self.allowed_origins = {f"http://{host}" for host in self.allowed_hosts}
         self.url = f"http://127.0.0.1:{actual_port}"
+
+    def chat_status(self) -> dict:
+        if self.session_factory is not None:
+            return {"configured": True, "provider": "gemini", "model": "isolated-test"}
+        from emporio_music.agent import configuration_status
+
+        return configuration_status(self.settings)
+
+    def _discard(self, identifier: str, conversation: _Conversation) -> None:
+        self.conversations.pop(identifier, None)
+        conversation.closed = True
+        conversation.session.close()
+
+    def _conversation(self, identifier: str | None) -> tuple[str, _Conversation, bool]:
+        with self.conversations_lock:
+            now = time.monotonic()
+            for key, conversation in list(self.conversations.items()):
+                if now - conversation.last_used >= _SESSION_TTL and conversation.lock.acquire(blocking=False):
+                    try:
+                        self._discard(key, conversation)
+                    finally:
+                        conversation.lock.release()
+            if identifier is not None:
+                try:
+                    valid = isinstance(identifier, str) and str(UUID(identifier)) == identifier
+                except (ValueError, AttributeError):
+                    valid = False
+                if not valid:
+                    raise ChatRequestError("Session ID must be a valid opaque identifier.")
+                conversation = self.conversations.get(identifier)
+                if conversation is None:
+                    raise ChatRequestError("This conversation expired or does not exist. Start a new conversation.", "session_not_found", 404)
+                return identifier, conversation, False
+            if len(self.conversations) >= _MAX_SESSIONS:
+                raise ChatRequestError("Too many local conversations. Close an existing conversation or restart the server.", "session_limit", 429)
+            if self.session_factory is None:
+                from emporio_music.agent import ChatSession
+
+                factory = ChatSession
+            else:
+                factory = self.session_factory
+            conversation = _Conversation(factory(self.settings))
+            identifier = str(uuid4())
+            self.conversations[identifier] = conversation
+            return identifier, conversation, True
+
+    def send_chat(self, message: str, identifier: str | None) -> dict:
+        identifier, conversation, created = self._conversation(identifier)
+        try:
+            with conversation.lock:
+                if conversation.closed:
+                    raise ChatRequestError("This conversation has ended. Start a new conversation.", "session_not_found", 404)
+                conversation.last_used = time.monotonic()
+                reply = conversation.session.send(message)
+                conversation.last_used = time.monotonic()
+                return {"session_id": identifier, "reply": reply.text, "tool_calls": _public_tool_traces(reply.tool_calls)}
+        except Exception:
+            if created:
+                with self.conversations_lock:
+                    self._discard(identifier, conversation)
+            raise
+
+    def reset_chat(self, identifier: str) -> None:
+        identifier, conversation, _ = self._conversation(identifier)
+        with self.conversations_lock:
+            self.conversations.pop(identifier, None)
+        with conversation.lock:
+            conversation.closed = True
+            conversation.session.close()
+
+    def server_close(self) -> None:
+        super().server_close()
+        with self.conversations_lock:
+            conversations = list(self.conversations.values())
+            self.conversations.clear()
+        for conversation in conversations:
+            if conversation.lock.acquire(blocking=False):
+                try:
+                    conversation.closed = True
+                    conversation.session.close()
+                finally:
+                    conversation.lock.release()
 
 
 class BrowserHandler(BaseHTTPRequestHandler):
@@ -73,6 +211,21 @@ class BrowserHandler(BaseHTTPRequestHandler):
         self._send(status, json.dumps(payload, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
     def _error(self, status: int, code: str, message: str) -> None:
+        # Drain small rejected POST bodies before closing the HTTP/1.0 connection.
+        # Otherwise Windows can reset the socket before the JSON error is received.
+        if self.command == "POST" and not getattr(self, "_body_consumed", False):
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if 0 < length <= 65536:
+                    previous_timeout = self.connection.gettimeout()
+                    try:
+                        self.connection.settimeout(1)
+                        self.rfile.read(length)
+                    finally:
+                        self.connection.settimeout(previous_timeout)
+            except (ValueError, OSError):
+                pass
+            self._body_consumed = True
         self._json({"error": message, "code": code}, status)
 
     def _trusted_request(self) -> bool:
@@ -123,6 +276,8 @@ class BrowserHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.OK, content, content_type)
             elif path == "/api/status":
                 self._json(self._status())
+            elif path == "/api/chat/status":
+                self._json(self.server.chat_status())
             elif path == "/api/products":
                 availability = query.get("availability", "all")
                 if availability not in {"all", "available", "unavailable"}:
@@ -170,7 +325,10 @@ class BrowserHandler(BaseHTTPRequestHandler):
             self.headers.get("Origin") is not None
             and self.headers.get("Origin") not in self.server.allowed_origins
         ):
-            self._error(HTTPStatus.FORBIDDEN, "invalid_request", "Import requests must come from the local application.")
+            self._error(HTTPStatus.FORBIDDEN, "invalid_request", "Requests must come from the local application.")
+            return
+        if self.path in {"/api/chat", "/api/chat/reset"}:
+            self._chat_request()
             return
         if self.path != "/api/load":
             self._error(HTTPStatus.NOT_FOUND, "not_found", "Resource not found.")
@@ -183,17 +341,70 @@ class BrowserHandler(BaseHTTPRequestHandler):
         except OSError:
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error", "The catalog snapshot could not be written.")
 
+    def _chat_request(self) -> None:
+        try:
+            if self.headers.get("Content-Type", "").split(";", 1)[0].strip() != "application/json":
+                raise ChatRequestError("Chat requests must contain JSON.")
+            if self.headers.get("Transfer-Encoding"):
+                raise ChatRequestError("Chunked chat requests are not supported.")
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                raise ChatRequestError("Invalid request body length.") from None
+            if not 0 < length <= 8192:
+                raise ChatRequestError("Chat request body must contain between 1 and 8192 bytes.")
+            try:
+                body = self.rfile.read(length)
+                self._body_consumed = True
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeError, json.JSONDecodeError):
+                raise ChatRequestError("Chat request body must contain valid UTF-8 JSON.") from None
+            if not isinstance(payload, dict):
+                raise ChatRequestError("Chat request body must be an object.")
+            identifier = payload.get("session_id")
+            if self.path == "/api/chat/reset":
+                if not isinstance(identifier, str):
+                    raise ChatRequestError("A session ID is required to end a conversation.")
+                self.server.reset_chat(identifier)
+                self._json({"reset": True})
+                return
+            message = payload.get("message")
+            if not isinstance(message, str) or not message.strip() or len(message) > 4000:
+                raise ChatRequestError("A message must contain between 1 and 4000 characters.")
+            self._json(self.server.send_chat(message.strip(), identifier))
+        except ChatRequestError as error:
+            self._error(error.status, error.code, str(error))
+        except Exception as error:
+            # Provider exception strings can include request details; never send them.
+            code = getattr(error, "code", "model_error")
+            messages = {
+                "model_not_configured": (503, "Configure GEMINI_API_KEY in the local environment before starting a conversation."),
+                "rate_limited": (429, "The model quota or rate limit was reached. Try again later."),
+                "rate_limit": (429, "The model quota or rate limit was reached. Try again later."),
+                "authentication_error": (503, "The model provider rejected the configured credentials."),
+                "provider_access_denied": (503, "Gemini rejected access. Check the local API key and project permissions."),
+                "model_unavailable": (503, "The configured Gemini model is unavailable. Check GEMINI_MODEL."),
+                "session_limit": (409, "The conversation limit was reached. Start a new conversation."),
+                "session_closed": (404, "This conversation has ended. Start a new conversation."),
+                "tool_limit": (422, "The tool-call limit was reached. Try a more focused question."),
+                "empty_response": (502, "Gemini did not produce a source-backed answer. Retry the question."),
+                "incomplete_response": (502, "Gemini did not complete its response. Retry with a shorter question."),
+                "model_error": (502, "The language model could not complete this request. Check the local provider configuration and try again."),
+            }
+            status, message = messages.get(code, messages["model_error"])
+            self._error(status, code if code in messages else "model_error", message)
 
-def create_server(settings: Settings, port: int = 8000) -> BrowserServer:
+
+def create_server(settings: Settings, port: int = 8000, session_factory: Callable | None = None) -> BrowserServer:
     """Create a server without starting a thread, allowing deterministic tests."""
-    return BrowserServer(settings, port)
+    return BrowserServer(settings, port, session_factory=session_factory)
 
 
 def serve(settings: Settings, port: int = 8000, open_browser: bool = False) -> None:
     """Serve the local interface until Ctrl+C, without changing source data."""
     with create_server(settings, port) as server:
         print(f"Local browser interface: {server.url}", flush=True)
-        print("Press Ctrl+C to stop. LLM integration is pending.", flush=True)
+        print("Press Ctrl+C to stop. Gemini chat requires a configured API key.", flush=True)
         if open_browser:
             try:
                 if not webbrowser.open(server.url):

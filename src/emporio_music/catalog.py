@@ -91,14 +91,23 @@ def search_products(
     max_price: str | Decimal | None = None,
     available: bool | None = None,
     limit: int = 20,
+    category_id: int | None = None,
 ) -> list[dict]:
     """Search literal name fragments; filter on the effective BRL price, inclusively."""
     if not isinstance(limit, int) or isinstance(limit, bool) or not 0 < limit <= 2**63 - 1:
         raise ValueError("Search limit must be a positive SQLite integer.")
     if available is not None and not isinstance(available, bool):
         raise ValueError("Availability must be true, false, or omitted.")
+    if category_id is not None and (
+        not isinstance(category_id, int) or isinstance(category_id, bool)
+        or not 0 < category_id <= 2**63 - 1
+    ):
+        raise ValueError("Category ID must be a positive SQLite integer.")
     conditions = []
     parameters: list = []
+    if category_id is not None:
+        conditions.append("category_id = ?")
+        parameters.append(category_id)
     if name.strip():
         escaped = normalize_text(name).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         conditions.append("search_name LIKE ? ESCAPE '\\'")
@@ -117,6 +126,14 @@ def search_products(
             + " ORDER BY effective_price_cents, product_id LIMIT ?", parameters,
         ).fetchall()
         return [_serialize(connection, row) for row in rows]
+
+
+def list_categories(database_path: Path) -> list[dict]:
+    """Discover supplied category IDs instead of guessing from product names."""
+    with _connect(database_path) as connection:
+        return [dict(row) for row in connection.execute(
+            "SELECT category_id, name FROM categories ORDER BY category_id"
+        )]
 
 
 def get_product(database_path: Path, product_id: int) -> dict | None:
