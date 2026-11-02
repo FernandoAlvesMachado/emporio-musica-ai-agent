@@ -32,14 +32,13 @@ function friendlyError(error, fallback) {
     model_unavailable: "O modelo configurado não está disponível para este projeto. Confira GEMINI_MODEL no .env.",
     provider_unavailable: "O Gemini está temporariamente indisponível. Tente novamente mais tarde.",
     model_timeout: "O Gemini não respondeu dentro do prazo. Tente novamente mais tarde.",
-    session_limit: "O limite desta conversa foi atingido. Use Nova conversa para continuar.",
     session_closed: "Esta conversa foi encerrada. Use Nova conversa para continuar.",
     tool_limit: "A consulta precisou de muitas etapas. Tente uma pergunta mais específica.",
     empty_response: "O Gemini não retornou uma resposta com consulta às fontes. Tente novamente.",
     incomplete_response: "O Gemini não concluiu a resposta. Tente uma pergunta mais curta.",
     model_error: "O Gemini não conseguiu concluir a resposta. Confira a configuração local e tente novamente.",
     session_not_found: "Esta conversa expirou ou foi encerrada. Clique em Nova conversa para começar de novo.",
-    session_limit: "O limite de conversas locais foi atingido. Encerre uma conversa ou reinicie a aplicação.",
+    session_limit: "O limite de mensagens ou conversas locais foi atingido. Use Nova conversa ou reinicie a aplicação.",
   };
   return messages[error.code] || fallback;
 }

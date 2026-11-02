@@ -1,6 +1,7 @@
 """Isolated source-tool tests; these do not exercise an external language model."""
 
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -103,3 +104,17 @@ def test_credit_tiers_and_cent_splits_do_not_offer_invalid_installments(registry
     assert twelve["eligible"] is False
     assert "installment_schedule" not in twelve
     assert registry.execute("quote_payment", {"product_id": 1, "payment_method": "pix", "installments": 2})["error"] == "invalid_arguments"
+
+
+def test_ambiguous_small_credit_installments_require_staff_confirmation(registry, recognized_payment_rules):
+    with sqlite3.connect(registry.settings.database_path) as connection:
+        connection.execute("UPDATE products SET price_cents = ? WHERE product_id = ?", (20000, 1))
+    result = registry.execute("quote_payment", {
+        "product_id": 1, "payment_method": "credit", "installments": 3,
+    })
+    # The synthetic 10% offer yields 180.00, or 60.00 each. The detailed
+    # exception allows this while the general 100.00 minimum does not.
+    assert result["total_brl"] == "180.00"
+    assert result["eligible"] is None
+    assert result["needs_staff_confirmation"] is True
+    assert "installment_schedule" not in result

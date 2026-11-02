@@ -51,11 +51,27 @@ def main() -> None:
             assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
             assert {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in TABLES} == counts
             for row in source["orders"]:
-                stored = connection.execute("SELECT total_cents FROM orders WHERE order_id=?", (int(row["order_id"]),)).fetchone()[0]
-                assert stored == int(Decimal(row["total_brl"]) * 100)
+                stored = connection.execute(
+                    "SELECT customer_id, total_cents, tracking_code, estimated_delivery, notes "
+                    "FROM orders WHERE order_id=?", (int(row["order_id"]),),
+                ).fetchone()
+                assert stored == (
+                    int(row["customer_id"]), int(Decimal(row["total_brl"]) * 100),
+                    row["tracking_code"].strip() or None,
+                    row["estimated_delivery"].strip() or None,
+                    row["notes"].strip() or None,
+                ), "An order relationship, total, or optional field differs from its source."
             for row in source["order_items"]:
                 stored = connection.execute("SELECT quantity FROM order_items WHERE order_id=? AND product_id=?", (int(row["order_id"]), int(row["product_id"]))).fetchone()[0]
                 assert stored == int(row["quantity"])
+            for row in source["promotions"]:
+                stored = connection.execute(
+                    "SELECT product_id, discount_percent, is_active FROM promotions WHERE promotion_id=?",
+                    (int(row["promotion_id"]),),
+                ).fetchone()
+                assert stored == (
+                    int(row["product_id"]), int(row["discount_percent"]), int(row["is_active"]),
+                ), "A promotion relationship, percentage, or active flag differs from its source."
 
         available_ids = set()
         expected_guitars = []
@@ -75,6 +91,11 @@ def main() -> None:
             assert product["effective_price_brl"] == str(effective)
             assert product["stock_quantity"] == int(row["stock_quantity"])
             assert product["available"] == available
+            assert product["status"] == row["status"].strip()
+            assert product["category_id"] == int(row["category_id"])
+            assert product["name"] == row["name"].strip()
+            assert product["description"] == (row["description"].strip() or None)
+            assert product["specs"] == (json.loads(row["specs"]) if row["specs"].strip() else None)
             expected_prices[identifier] = effective
             assert {offer["promotion_id"] for offer in product["active_promotions"]} == {int(offer["promotion_id"]) for offer in offers}
             if int(row["category_id"]) == 5 and available and effective <= Decimal("1000"):
@@ -108,7 +129,7 @@ def main() -> None:
         "available_category_5_up_to_brl_1000": [row["product_id"] for row in guitars],
         "policy_pages": len(pages),
         "payment_checks": {"product_81_pix_brl": pix["total_brl"], "product_90_pix_brl": promotional_pix["total_brl"], "stacked_discounts": False, "credit_schedule_total_preserved": True},
-        "checks": ["all source prices/stocks/active offers", "all quantities and stored order totals", "foreign keys", "repeat import", "category budget filter", "missing products", "complete policy pages", "source-checked payment quotes"],
+        "checks": ["all source prices/stocks/statuses/specifications/active offers", "all promotion flags/percentages/relationships", "all quantities and stored order totals/relationships/optional fields", "foreign keys", "repeat import", "category budget filter", "missing products", "complete policy pages", "source-checked payment quotes"],
     }, indent=2))
 
 

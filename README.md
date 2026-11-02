@@ -9,11 +9,11 @@ integration uses Google's Gemini API, a conversational terminal interface, and
 bounded, nonpersistent conversation context. Implementation and verification are
 tracked separately; a working data query is not proof of a functioning AI agent.
 
-**Real-model verification is currently BLOCKED by external provider failures.**
-A key is now present locally;
-the configured-model probe returned HTTP 503/UNAVAILABLE and the explicitly tested
-AI Studio alias timed out. Isolated tests and deterministic source checks do not prove that
-the external integration works. No real conversation transcripts are claimed.
+**Real-model verification is currently BLOCKED by HTTP 503 from Gemini.**
+The local key is present and the configured model is `gemini-3.1-flash-lite`.
+Both the application scenario and a minimal native-SDK diagnostic failed during
+this audit. Isolated tests and deterministic source checks do not establish
+external model behavior. No delivery conversation transcripts are claimed.
 See [the validation report](docs/validation_report.md) for evidence and remaining
 delivery requirements.
 
@@ -70,7 +70,7 @@ Linux/macOS:
 Add your Gemini API key to `.env` as `GEMINI_API_KEY=...`; do not paste it into chat,
 commit it, or include it in execution evidence. Obtain a key from
 [Google AI Studio](https://aistudio.google.com/apikey). Google Gemini was selected
-at the project owner's request. The default model is `gemini-3.8-flash`;
+at the project owner's request. The default model is `gemini-3.1-flash-lite`;
 `GEMINI_MODEL` can select another compatible model available to your account.
 The `gemini-flash-latest` identifier shown in the AI Studio example is also accepted
 through `GEMINI_MODEL`. It is an alias whose target may change; this project never
@@ -106,8 +106,9 @@ does not silently substitute fixed or simulated replies after a provider error.
 Without a key, or when the provider rejects a request, an explicit configuration
 or provider error is shown. A failed call is not a successful chatbot demonstration.
 
-The [official function-calling guide](https://ai.google.dev/gemini-api/docs/function-calling)
-is the implementation reference. A manual tool loop keeps model decisions visible
+The [official Interactions guide](https://ai.google.dev/gemini-api/docs/interactions-overview)
+and [function-calling guide](https://ai.google.dev/gemini-api/docs/function-calling)
+are the implementation references, checked again on November 2, 2026. A manual tool loop keeps model decisions visible
 in application code and avoids introducing an agent framework. API interactions
 use `store=False`; session context is held locally in memory, not persisted as
 conversation files. This setting does not replace Google's applicable service and
@@ -195,11 +196,12 @@ Windows or Linux. `.env.example` documents the following environment variables:
 | `EMPORIO_DATABASE_PATH` | `data/processed/emporio.sqlite3` |
 | `EMPORIO_POLICIES_PATH` | `data/raw/políticas_da_loja.pdf` |
 | `GEMINI_API_KEY` | No default; required for chat |
-| `GEMINI_MODEL` | `gemini-3.8-flash` |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite` |
 | `EMPORIO_CHAT_LANGUAGE` | `pt-BR` |
 | `EMPORIO_MODEL_TIMEOUT` | `45` seconds |
 | `EMPORIO_MAX_TOOL_ROUNDS` | `6` |
 | `EMPORIO_MAX_TURNS` | `20` |
+| `EMPORIO_THINKING_BUDGET` | `1024`; `none` omits this provider option |
 
 Absolute paths are accepted. Relative data paths resolve against the project root.
 `--root PATH` overrides `EMPORIO_PROJECT_ROOT` and must precede the subcommand.
@@ -208,6 +210,9 @@ process environment take precedence over `.env`. Do not rely on activation of a
 virtual environment to supply credentials. `--language en` overrides the default
 chat language for that CLI session. Limits bound model/tool iterations and session
 growth; they do not establish a provider spending cap.
+The example `.env` selects a 60-second request timeout; the code default is 45
+seconds when that variable is absent. A provider error leaves the conversation
+unanswered; retry explicitly after checking provider availability.
 
 ## Development commands
 
